@@ -9,17 +9,12 @@ import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Message;
-import net.dv8tion.jda.api.entities.User;
-import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
-import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
 import net.dv8tion.jda.api.requests.GatewayIntent;
 import net.dv8tion.jda.api.utils.ChunkingFilter;
 import net.dv8tion.jda.api.utils.MemberCachePolicy;
 
-import java.awt.*;
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.List;
 
@@ -51,40 +46,54 @@ public class Main {
     public static File analyze(String kw, Guild guild) throws IOException {
         botMember = guild.getSelfMember();
         UUID uuid = UUID.randomUUID();
-        System.out.println("Starting a analysis function with uuid: " + uuid);
+        System.out.println("Starting analysis: " + uuid);
 
-        ArrayList<History> messageHistories = new ArrayList<>();
         Stats stats = new Stats(guild);
+        kw = kw.toLowerCase(Locale.ROOT); // 統一大小寫
 
-        GuildChannel[] channels = guild.getTextChannels().toArray(new GuildChannel[0]);
-        for (GuildChannel channel : channels) {
-            if (!botMember.hasAccess(channel)) continue;
-            messageHistories.add(new History((MessageChannel) channel));
-        }
-        System.out.println("Message histories have been collected, starting to search for keyword: " + kw);
+        String finalKw = kw;
+        guild.getTextChannels().forEach(channel -> {
+            if (!botMember.hasAccess(channel)) return;
 
-        for (History history : messageHistories) {
-            searchHistory(history.messages, kw, stats);
-        }
-        System.out.println("Keyword search completed, clean zeros...");
+            String channelName = channel.getName();
+            System.out.println("Fetching messages from #" + channelName);
 
-        List<User> toRemove = new ArrayList<>();
-        for (Map.Entry<User, Integer> entry : stats.userMessageCount.entrySet()) {
-            if (entry.getValue() <= 0) toRemove.add(entry.getKey());
-        }
-        for (User user : toRemove) {
-            stats.userMessageCount.remove(user);
-        }
-        System.out.println(Arrays.toString(stats.userMessageCount.entrySet().toArray()));
+            // 初始分頁
+            List<Message> batch = channel.getHistory().retrievePast(100).complete();
 
-        System.out.println("Drawing stats to a PNG file...");
-        Drawer drawer = new Drawer(stats.userMessageCount, java.nio.file.Paths.get(uuid.toString() + ".png"), "Analyzation of Keyword: " + kw);
+            while (!batch.isEmpty()) {
+                for (Message message : batch) {
+                    // 過濾
+                    if (message.getAuthor().isBot() || message.isWebhookMessage()) continue;
+                    if (message.getType() != net.dv8tion.jda.api.entities.MessageType.DEFAULT) continue;
+
+                    // 關鍵字比對
+                    if (message.getContentRaw().toLowerCase(Locale.ROOT).contains(finalKw) && !message.getContentRaw().startsWith("!analyze")) {
+                        System.out.println("Found keyword in #" + channelName + " from " + message.getAuthor().getName() + ": " + message.getContentRaw());
+                        stats.userMessageCount.merge(message.getAuthor(), 1, Integer::sum);
+                    }
+                }
+                // 分頁遞迴
+                long oldestId = batch.get(batch.size() - 1).getIdLong();
+                batch = channel.getHistoryBefore(oldestId, 100).complete().getRetrievedHistory();
+
+                try { Thread.sleep(350); } catch (InterruptedException ignored) {}
+            }
+        });
+
+        // 移除計數為 0 的使用者
+        stats.userMessageCount.entrySet().removeIf(e -> e.getValue() <= 0);
+
+        System.out.println("Final counts: " + stats.userMessageCount);
+
+        Drawer drawer = new Drawer(stats.userMessageCount,
+                java.nio.file.Paths.get(uuid.toString() + ".png"),
+                "Keyword Analysis: " + kw);
         drawer.exportToPNG(800, 800);
 
-        System.out.println("Stats have been drawn, returning the file...");
-        return Paths.get(uuid.toString() + ".png").toFile();
-
+        return java.nio.file.Paths.get(uuid.toString() + ".png").toFile();
     }
+
 
     public static void searchHistory(List<Message> messages, String kw, Stats stats) {
         for (Message message : messages) {

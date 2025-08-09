@@ -21,7 +21,8 @@ public class Listener extends ListenerAdapter {
                 return;
             }
 
-            System.out.println("A ananlyze command has been received from " + event.getAuthor().getName() + " in " + event.getGuild().getName());
+            event.getChannel().sendMessage("An analysis command has been received from " + event.getAuthor().getName() + " in " + event.getGuild().getName()).queue();
+            System.out.println("An analysis command has been received from " + event.getAuthor().getName() + " in " + event.getGuild().getName());
 
             String kw = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
             Guild guild = event.getGuild();
