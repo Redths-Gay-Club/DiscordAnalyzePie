@@ -14,30 +14,34 @@ import java.util.Arrays;
 public class Listener extends ListenerAdapter {
     @Override
     public void onMessageReceived(@NotNull MessageReceivedEvent event) {
-        String args[] = event.getMessage().getContentRaw().split(" ");
-        if (args[0].equalsIgnoreCase("!analyze")) {
-            if (args.length < 2) {
-                event.getChannel().sendMessage("Usage: !analyze <keyword>").queue();
-                return;
-            }
-
-            event.getChannel().sendMessage("An analysis command has been received from " + event.getAuthor().getName() + " in " + event.getGuild().getName()).queue();
-            System.out.println("An analysis command has been received from " + event.getAuthor().getName() + " in " + event.getGuild().getName());
-
-            String kw = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
-            Guild guild = event.getGuild();
-            try {
-                File file = Main.analyze(kw, guild);
-                if (file.exists()) {
-                    event.getChannel().sendMessage("").addFiles(FileUpload.fromData(file)).queue();
-                } else {
-                    event.getChannel().sendMessage("Analysis failed, please try again.").queue();
+        Thread thread = new Thread(() -> {
+            String args[] = event.getMessage().getContentRaw().split(" ");
+            if (args[0].equalsIgnoreCase("!analyze")) {
+                if (args.length < 2) {
+                    event.getChannel().sendMessage("Usage: !analyze <keyword>").queue();
+                    return;
                 }
-            } catch (IOException e) {
-                event.getChannel().sendMessage("An error occurred while analyzing the keyword.").queue();
-                throw new RuntimeException(e);
-            }
 
-        } else return;
+                event.getChannel().sendMessage("An analysis command has been received from " + event.getAuthor().getName() + " in " + event.getGuild().getName()).queue();
+                System.out.println("An analysis command has been received from " + event.getAuthor().getName() + " in " + event.getGuild().getName());
+
+                String kw = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
+                Guild guild = event.getGuild();
+                try {
+                    File file = Main.analyze(kw, guild);
+                    if (file.exists()) {
+                        event.getChannel().sendMessage("").addFiles(FileUpload.fromData(file)).queue();
+                    } else {
+                        event.getChannel().sendMessage("Analysis failed, please try again.").queue();
+                    }
+                } catch (IOException e) {
+                    event.getChannel().sendMessage("An error occurred while analyzing the keyword.").queue();
+                    throw new RuntimeException(e);
+                }
+
+            } else return;
+        });
+
+        thread.start();
     }
 }
