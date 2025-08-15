@@ -6,6 +6,7 @@ import me.rtx4090.type.Stats;
 import me.rtx4090.utils.Drawer;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.entities.Activity;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Message;
@@ -36,6 +37,7 @@ public class Main {
                     .addEventListeners(new me.rtx4090.utils.Listener())
                     .setChunkingFilter(ChunkingFilter.ALL)
                     .setMemberCachePolicy(MemberCachePolicy.ALL)
+                    .setActivity(Activity.playing("!analyze <keyword>"))
                     .build();
 
         } catch (Exception e) {
